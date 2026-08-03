@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#304090" />
+  <title>Shikho — এখনই কল করো</title>
+  <meta name="description" content="Shikho তে ভর্তি ও কোর্স সম্পর্কে জানতে এখনই কল করো ১৬৭৮০।" />
+  <link rel="icon" href="/favicon.ico" />
+
+  <!-- Open Graph (for when the link is shared) -->
+  <meta property="og:title" content="Shikho — এখনই কল করো" />
+  <meta property="og:description" content="ভর্তি ও কোর্স সম্পর্কে জানতে এখনই কল করো ১৬৭৮০।" />
+  <meta property="og:type" content="website" />
+
+  <style>
+    /* Self-hosted Bangla (Bengali subset) — same-origin, no third-party
+       render-blocking request. Latin/numerals use the system font. */
+    @font-face {
+      font-family: 'Hind Siliguri'; font-style: normal; font-weight: 500;
+      font-display: swap; src: url('/hs-500.woff2') format('woff2');
+    }
+    @font-face {
+      font-family: 'Hind Siliguri'; font-style: normal; font-weight: 600;
+      font-display: swap; src: url('/hs-600.woff2') format('woff2');
+    }
+    @font-face {
+      font-family: 'Hind Siliguri'; font-style: normal; font-weight: 700;
+      font-display: swap; src: url('/hs-700.woff2') format('woff2');
+    }
+
+    :root {
+      --indigo-600: #304090;
+      --indigo-700: #262F74;
+      --indigo-800: #1B2356;
+      --indigo-50:  #F1F2FB;
+      --magenta:    #C02080;
+      --coral:      #E03050;
+      --sunrise:    #E0A010;
+      --ink-900:    #0F1322;
+      --ink-500:    #545576;
+      --paper:      #FFFFFF;
+      --font-bn:    'Hind Siliguri', system-ui, sans-serif;
+      --font-en:    system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+    html, body { height: 100%; }
+
+    body {
+      font-family: var(--font-bn);
+      color: var(--ink-900);
+      background:
+        radial-gradient(1100px 600px at 50% -10%, rgba(48,64,144,0.16), transparent 60%),
+        radial-gradient(900px 500px at 90% 110%, rgba(192,32,128,0.10), transparent 55%),
+        linear-gradient(180deg, #FBFBFE 0%, var(--indigo-50) 100%);
+      min-height: 100%;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: env(safe-area-inset-top) 20px calc(env(safe-area-inset-bottom) + 20px);
+    }
+
+    /* ---------- Header ---------- */
+    header {
+      width: 100%;
+      max-width: 480px;
+      display: flex;
+      justify-content: center;
+      padding: 26px 0 0;
+    }
+    header a { display: block; line-height: 0; }
+    header img { height: 52px; width: auto; display: block; }
+
+    /* ---------- Main card ---------- */
+    main {
+      width: 100%;
+      max-width: 480px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      gap: 22px;
+      margin-top: 30px; /* breathing space below the logo */
+    }
+
+    .card {
+      background: var(--paper);
+      border: 1px solid rgba(48,64,144,0.08);
+      border-radius: 28px;
+      padding: 34px 26px 30px;
+      box-shadow: 0 18px 44px rgba(18,24,56,0.12);
+      text-align: center;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--indigo-50);
+      color: var(--indigo-700);
+      font-family: var(--font-en);
+      font-weight: 600;
+      font-size: 13px;
+      letter-spacing: 0.02em;
+      padding: 8px 15px;
+      border-radius: 9999px;
+      margin-bottom: 20px;
+    }
+    .badge .dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: #1F8A5B;
+      box-shadow: 0 0 0 0 rgba(31,138,91,0.55);
+      animation: live 1.8s ease-out infinite;
+    }
+    @keyframes live {
+      0%   { box-shadow: 0 0 0 0 rgba(31,138,91,0.55); }
+      70%  { box-shadow: 0 0 0 9px rgba(31,138,91,0); }
+      100% { box-shadow: 0 0 0 0 rgba(31,138,91,0); }
+    }
+
+    h1 {
+      font-size: clamp(26px, 7.2vw, 34px);
+      line-height: 1.28;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      color: var(--ink-900);
+    }
+    h1 .hl { color: var(--magenta); }
+
+    .sub {
+      margin-top: 14px;
+      font-size: 16.5px;
+      line-height: 1.6;
+      color: var(--ink-500);
+      font-weight: 500;
+    }
+
+    /* ---------- Call button ---------- */
+    .call-wrap { position: relative; margin-top: 30px; }
+
+    /* pulsing ring behind the button */
+    .call-wrap::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: 9999px;
+      background: var(--magenta);
+      opacity: 0.35;
+      animation: ring 2s cubic-bezier(.22,.61,.36,1) infinite;
+      z-index: 0;
+    }
+    @keyframes ring {
+      0%   { transform: scale(1);    opacity: 0.35; }
+      70%  { transform: scale(1.10); opacity: 0; }
+      100% { transform: scale(1.10); opacity: 0; }
+    }
+
+    .call-btn {
+      position: relative;
+      z-index: 1;
+      overflow: hidden;               /* clip the shine sweep to the pill */
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      width: 100%;
+      min-height: 74px;
+      padding: 0 22px;
+      border: none;
+      border-radius: 9999px;
+      text-decoration: none;
+      color: #fff;
+      background: linear-gradient(135deg, var(--indigo-600) 0%, var(--magenta) 100%);
+      box-shadow: 0 12px 26px rgba(192,32,128,0.36), inset 0 1px 0 rgba(255,255,255,0.25);
+      font-family: var(--font-bn);
+      font-weight: 700;
+      transition: transform .14s ease, box-shadow .14s ease;
+      cursor: pointer;
+      animation: breath 2.8s ease-in-out infinite;  /* gentle swell — uses `scale`
+                                                       so `transform` stays free for press */
+    }
+    @keyframes breath {
+      0%, 100% { scale: 1; }
+      50%      { scale: 1.025; }
+    }
+    .call-btn:active {
+      transform: translateY(2px);
+      box-shadow: 0 6px 16px rgba(192,32,128,0.34), inset 0 1px 0 rgba(255,255,255,0.25);
+    }
+    /* glossy light streak that sweeps across every ~3.6s */
+    .call-btn::after {
+      content: "";
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      z-index: 1;
+      pointer-events: none;
+      background: linear-gradient(105deg, transparent 36%, rgba(255,255,255,0.55) 50%, transparent 64%);
+      transform: translateX(-160%) skewX(-12deg);
+      animation: shine 3.6s ease-in-out infinite;
+    }
+    @keyframes shine {
+      0%   { transform: translateX(-160%) skewX(-12deg); }
+      26%  { transform: translateX(160%)  skewX(-12deg); }
+      100% { transform: translateX(160%)  skewX(-12deg); }
+    }
+    .call-btn .icon {
+      width: 30px; height: 30px;
+      flex: 0 0 auto;
+      position: relative; z-index: 2;  /* keep icon crisp above the shine */
+      animation: shake 2.4s ease-in-out infinite;
+    }
+    @keyframes shake {
+      0%, 88%, 100% { transform: rotate(0); }
+      90%  { transform: rotate(-12deg); }
+      94%  { transform: rotate(12deg); }
+      97%  { transform: rotate(-8deg); }
+    }
+    .call-btn .txt { display: flex; flex-direction: column; align-items: flex-start; line-height: 1.1; position: relative; z-index: 2; }
+    .call-btn .txt small { font-size: 14px; font-weight: 500; opacity: 0.92; }
+    .call-btn .txt strong { font-family: var(--font-en); font-size: 27px; font-weight: 700; letter-spacing: 0.02em; }
+
+    .hint {
+      margin-top: 16px;
+      font-size: 14px;
+      color: var(--ink-500);
+    }
+    .hint a { color: var(--indigo-700); font-family: var(--font-en); font-weight: 600; text-decoration: none; }
+
+    /* ---------- Reassurance row ---------- */
+    .assure {
+      display: flex;
+      justify-content: center;
+      gap: 22px;
+      flex-wrap: wrap;
+      padding: 0 4px;
+    }
+    .assure div {
+      display: flex; align-items: center; gap: 7px;
+      font-size: 13.5px; font-weight: 600; color: var(--indigo-700);
+    }
+    .assure svg { width: 17px; height: 17px; color: var(--magenta); flex: 0 0 auto; }
+
+    footer {
+      width: 100%;
+      max-width: 480px;
+      text-align: center;
+      padding-top: 18px;
+      font-size: 12px;
+      color: #9AA0B4;
+      font-family: var(--font-en);
+    }
+
+    @media (max-width: 360px) {
+      .card { padding: 28px 20px 26px; }
+      .call-btn .txt strong { font-size: 24px; }
+    }
+
+    /* Respect users who prefer less motion */
+    @media (prefers-reduced-motion: reduce) {
+      .badge .dot, .call-wrap::before, .call-btn,
+      .call-btn::after, .call-btn .icon { animation: none; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <a href="https://shikho.com" target="_blank" rel="noopener" aria-label="Shikho ওয়েবসাইটে যাও">
+      <img src="/shikho-logo.svg" alt="Shikho" />
+    </a>
+  </header>
+
+  <main>
+    <section class="card">
+      <span class="badge"><span class="dot"></span> শিখো হেল্পলাইন</span>
+
+      <h1>এখনই কল করে<br /><span class="hl">জেনে নাও</span></h1>
+      <p class="sub">ভর্তি, কোর্স আর ডিসকাউন্ট সম্পর্কে জানতে আমাদের এক্সপার্টের সাথে কথা বলো।</p>
+
+      <div class="call-wrap">
+        <a class="call-btn" href="tel:16780" id="callBtn" aria-label="কল করো ১৬৭৮০">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path d="M6.5 3.5c.6 0 1.13.4 1.29.98l.9 3.3a1.34 1.34 0 0 1-.35 1.3l-1.4 1.4a13.5 13.5 0 0 0 5.1 5.1l1.4-1.4a1.34 1.34 0 0 1 1.3-.35l3.3.9c.58.16.98.69.98 1.29V20a1.5 1.5 0 0 1-1.5 1.5C10.9 21.5 2.5 13.1 2.5 5A1.5 1.5 0 0 1 4 3.5h2.5Z" fill="currentColor"/>
+          </svg>
+          <span class="txt">
+            <small>এখনই কল করো</small>
+            <strong>16780</strong>
+          </span>
+        </a>
+      </div>
+
+      <p class="hint">কল না হলে ডায়াল করো&nbsp;<a href="tel:16780">16780</a></p>
+    </section>
+
+    <div class="assure">
+      <div>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+        ফ্রি কাউন্সেলিং
+      </div>
+      <div>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+        দেশসেরা শিক্ষক
+      </div>
+    </div>
+  </main>
+
+  <footer>© Shikho · Bangladesh's largest learning platform</footer>
+
+  <script>
+    // Fire a lightweight, guarded conversion event so it "just works"
+    // if GTM / gtag is ever added later. No external dependency.
+    document.getElementById('callBtn').addEventListener('click', function () {
+      try {
+        if (window.dataLayer) window.dataLayer.push({ event: 'call_now_click', phone: '16780' });
+        if (typeof window.gtag === 'function') window.gtag('event', 'call_now_click', { phone: '16780' });
+      } catch (e) {}
+    });
+  </script>
+</body>
+</html>
