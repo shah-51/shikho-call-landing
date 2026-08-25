@@ -8,6 +8,28 @@
 
 ## Findings that travel here (cross-relevance)
 
+### 2026-08-25 · SameSite=Strict silently makes OAuth consent impossible (and three other cookie traps)
+**Source:** data-agent (OAuth consent rebuild). **Who needs it:** **every project with a browser session AND an external redirect** — social-dashboard (Atlas/Cartora), purple-fox platform, adops-os, career-ops-private, report-sender-dashboard, and anything doing OAuth, SSO, Stripe returns, or payment callbacks.
+`SameSite=Strict` is not sent on a **cross-site top-level navigation**, and an OAuth consent redirect (claude.ai → our `/authorize`) is exactly that. The result is not an error: the page renders its **signed-out branch forever**, which reads like "your session expired" rather than "the cookie policy forbids this". Hours vanish debugging session storage that is working perfectly.
+**Fix:** `SameSite=Lax` — sent on top-level cross-site GETs, still refuses cross-site POSTs and subresources. Do NOT let CSRF protection rest on SameSite either way: keep a **per-session CSRF token** on every cookie-authenticated mutation, compared in constant time. **Write the reason in the code**, because the next reviewer sees `Lax` and reads it as a weakness to tighten.
+**Three siblings worth checking in the same pass:**
+- **Clearing a cookie must repeat the same `Domain`.** A `Set-Cookie` that omits the Domain the cookie was set with does not overwrite it — sign-out "works" while the session survives.
+- **`Domain=.parent.com` is what lets a console on `app.x.com` share a session with an API on `x.com`.** Without it the subdomain console cannot authenticate against the apex, which is the usual reason a "just move it to a subdomain" ticket turns into a day.
+- **Wildcard CORS is invalid with credentials.** The moment cookies arrive, `Access-Control-Allow-Origin: *` has to be split by surface: open for the machine API, echo-own-origin-with-credentials for the browser console.
+
+### 2026-08-25 · Screenshot the page: three bugs survived 290 passing tests and died in one look
+**Source:** data-agent console. **Who needs it:** **every project that ships a UI** — paid-ads-dashboard, organic-social-dashboard, social-dashboard, purple-fox, shah-portfolio, video-studio, adops-os.
+The suite was green (290), every tab rendered, escaping held, both themes resolved. Opening the console in a real browser immediately showed an **operator with every data source** being told **"Sources granted: 0"** and **"Can dispatch reports: No, read only"**, plus a session labelled **"Token expires: Never"**.
+**The code was correct.** A console session deliberately carries no data-plane scope (so a stolen session cannot query anything), and the UI was faithfully printing that internal fact as the person's *entitlements*. **No assertion could have caught it**, because every value was exactly what the function was designed to return. The defect exists only at the point a human reads it. A fourth appeared in the same screenshot: `input[type=email]` missing from a CSS selector list, so the sign-in field rendered narrower than its button.
+**The rule:** programmatic verification proves the system does what it was told; it cannot tell you that **what it was told to say is wrong**. Any field that is correct for an authorisation decision is not automatically correct to display. Budget one real look at every screen before calling a UI done — and if screenshots do not work in your environment, say so out loud rather than letting "tests pass" stand in for "I saw it".
+
+### 2026-08-25 · CREATE TABLE IF NOT EXISTS does nothing to an existing table, so re-running a migration is not a migration
+**Source:** data-agent (console auth schema). **Who needs it:** **every project with hand-rolled SQL migrations** — paid-ads-analytics, organic-social, social-dashboard, purple-fox, cartora-outbound, adops-os, career-ops-private, report-engine.
+A column was added to an existing table's `CREATE TABLE IF NOT EXISTS` block and the migration re-run. It printed ten cheerful `ok` lines **and did not add the column** — `IF NOT EXISTS` applies to the TABLE, not to its columns, so the whole statement was a no-op. The new INSERT would have failed in production with "column does not exist", on a code path that had just been "successfully migrated".
+Caught only because the migration was followed by an explicit `information_schema` check instead of trusting the exit code. **An idempotent DDL file needs BOTH:** the `CREATE TABLE IF NOT EXISTS` for a fresh database, and an explicit `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` for every column added after the first apply.
+**Generalises:** a migration that reports success is not evidence the schema is what you think. Verify the SHAPE, not the exit code — one `information_schema` query at the end of the script costs nothing and is the only thing that actually answers the question.
+
+
 ### 2026-08-25 · Machine clients cannot log in: split the credential from the identity before arguing about passwords
 **Source:** data-agent (console auth rebuild). **Who needs it:** **every project that serves BOTH a machine client and a human** — report-sender / whatsapp-group-reporting (relay tokens), cartora-outbound, social-dashboard (Atlas), purple-fox, adops-os, career-ops-private, and any future MCP server.
 The ask was "replace token login with user id and password". Taken literally it is **impossible**: Claude, ChatGPT and Gemini have no login UI and can only present a bearer credential. But the goal behind it was sound, and the useful reframe is that **ONE token was doing TWO jobs** — a machine credential for an AI client, and the human login for the web console. Those have opposite requirements (long-lived and portable vs short-lived and revocable), which is exactly why people were copy-pasting tokens between devices: pasting one *was* the way to sign in.
@@ -21,28 +43,7 @@ The ask was "replace token login with user id and password". Taken literally it 
 **The three costs, all mandatory, none optional:**
 1. `SameSite=Strict` on the session cookie (barrier one).
 2. A **per-session CSRF token** required on every cookie-authenticated mutation, compared in constant time (barrier two). Bearer requests must stay exempt, or you have broken your API for no gain.
-3. **Retire `Access-Control-Allow-Origin: *` on the cookie routes.** Wildcard origin plus credentials is invalid and unsafe; split CORS by surface — open for the machine API, own-origin-with-credentials for the console.
-**Two more that are easy to miss:** an unauthenticated "email me a link" endpoint is an **email bomb** without per-address and per-IP rate limits; and it must reply **identically for known and unknown addresses** or it becomes a user-enumeration oracle. Verify that by diffing the two responses byte for byte, not by reading the code.
-**Scope the session deliberately:** here a session authorises the management plane ONLY and carries no data-source scope at all, so a stolen session cannot query a BI tool or an ad account. That cap is what made it safe to let a session take the highest role across a person's tokens.
-
-
-### 2026-08-25 · The commonest dashboard bug is a READER WITH NO WRITER, and it is now a CI test you can copy
-**Source:** data-agent (admin console build). **Who needs it:** **every project with a DB-backed dashboard or report view** — shikho-paid-ads-dashboard, shikho-organic-social-analytics, social-dashboard (Atlas/Cartora), purple-fox, adops-os, career-ops-private.
-In one build this shipped **twice**. First: three new Neon tables, twelve endpoints reading them, a writer for **one** table — so six of twelve endpoints could only ever return empty. Then, after fixing that: **eight columns declared with no writer**, three of which the UI depended on (`params_summary` was the field the audit row's "Details" expander reads, so every row would have expanded to nothing), plus **four indexes on always-NULL columns** costing writes on the hot path for zero reads.
-**Why review does not catch it:** an empty table and a correct-but-unfed query are **indistinguishable**. The SQL is valid, the endpoint returns 200, the tests pass, and the tab is just... empty. It reads as "no data yet".
-**The tells, worth grepping for in your own repo:** a column that a WHERE clause filters on but no INSERT lists; a read endpoint whose first row nobody can name the code path for; a table created in the same commit as the endpoints that read it.
-**What actually fixed it** (and what to copy): `data-agent/tests/dashboard-schema.test.mjs` — parses the DDL, extracts every INSERT column list from the writer module, and **fails CI** on any column that is declared but never written, any index covering such a column, and any GRANT of DELETE. Deliberately-unwritten columns live in a `RESERVED` map **with a reason string**, so "unexplained" is the only thing it can flag. ~90 lines, no dependencies, and it was verified by injecting a fake dead column and watching it fail. Per the workspace escalation rule: this recurred, so it became enforcement rather than a third write-up.
-**The review question that generalises:** for each new read endpoint, **name the code path that produces its first row.** If you cannot, it is decoration.
-
-### 2026-08-25 · Validate generated SQL against real Postgres with a TEMP table — two bugs died instantly that survived careful reading
-**Source:** data-agent (Neon dashboard writers). **Who needs it:** **every project that hand-writes SQL against Neon/Postgres** — shikho-paid-ads-analytics, shikho-organic-social-analytics, social-dashboard, purple-fox, cartora-outbound, adops-os, career-ops-private, report-engine.
-Two bugs in hand-written SQL passed review and died on first contact with a real database:
-1. **`ON CONFLICT DO UPDATE` references the target row by the table's UNQUALIFIED name.** `access_registry.source_status.query_count + 1` is not the documented form; `source_status.query_count + 1` is.
-2. **A parameter that is bound but never referenced fails the WHOLE statement** with `42P18 could not determine data type of parameter $n`. This happened because an error-path branch reused a shared params array whose latency slot its SQL never mentions. **This was the dangerous one:** it sat inside a fire-and-forget write (`.catch(() => {})`), so in production every source-error row would have been discarded silently, and the Sources tab would have shown a permanently healthy system.
-**The technique, ~2 minutes and needs no schema privileges:** `CREATE TEMP TABLE` mirroring the real shape, run the statements **verbatim** through Neon's HTTP `/sql` **batch** endpoint (a batch shares one session, so the TEMP table is visible across statements), then assert on the read-back. It caught the 42P18 immediately and also proved the running-average arithmetic (100 → 150 → 200, preserved through a NULL write).
-**Rule:** fire-and-forget writes deserve this **more** than normal ones, precisely because they can never fail loudly. If a write is wrapped in an empty catch, you have chosen to never learn it is broken — so prove it works once, up front.
-
-### 2026-08-25 · A deny-list on an open-ended input is an escala
+3. **Retire `Access-Control-Allow-Origin: *` on the cookie routes.**
 
 ## Recent across all projects (last 14 days)
 
