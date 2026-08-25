@@ -8,6 +8,24 @@
 
 ## Findings that travel here (cross-relevance)
 
+### 2026-08-25 · Machine clients cannot log in: split the credential from the identity before arguing about passwords
+**Source:** data-agent (console auth rebuild). **Who needs it:** **every project that serves BOTH a machine client and a human** — report-sender / whatsapp-group-reporting (relay tokens), cartora-outbound, social-dashboard (Atlas), purple-fox, adops-os, career-ops-private, and any future MCP server.
+The ask was "replace token login with user id and password". Taken literally it is **impossible**: Claude, ChatGPT and Gemini have no login UI and can only present a bearer credential. But the goal behind it was sound, and the useful reframe is that **ONE token was doing TWO jobs** — a machine credential for an AI client, and the human login for the web console. Those have opposite requirements (long-lived and portable vs short-lived and revocable), which is exactly why people were copy-pasting tokens between devices: pasting one *was* the way to sign in.
+**The split:** the console gets human identity (session cookie), the AI client keeps the bearer token, and the console becomes the only place a token is ever produced. Nothing about the MCP surface changed, so no client broke.
+**Magic link beat password on the merits, not on taste:** email was **already** the identity (`users.user_email` is the unique natural key and every active grant carried one), delivery already existed, and **a password needs a reset flow that requires email anyway** — so password is strictly *more* machinery on top of everything magic link needs, plus a new class of stored secret that people reuse across sites. If your project already has email + an email-keyed user table, passwordless is the smaller build, not the fancier one.
+**Generalises past auth:** when a request cannot be implemented as stated, the goal behind it usually still can. Name the jobs the current design conflates before debating the mechanism.
+
+### 2026-08-25 · Moving from an API key header to a session cookie ADDS a vulnerability class (and three costs)
+**Source:** data-agent. **Who needs it:** **any project migrating from API keys/bearer tokens to browser sessions** — social-dashboard, adops-os, purple-fox platform, career-ops-private, report-sender-dashboard.
+`Authorization: Bearer` is **structurally immune to CSRF**: a hostile page cannot set that header cross-origin, and cannot read the token out of another origin's storage. Cookies are attached by the browser **automatically**, so the moment sessions land, every mutating route becomes CSRF-reachable. The move is still correct — `HttpOnly` means an XSS can no longer exfiltrate a credential that works forever from any machine — but it is a **trade, not an upgrade**, and it is easy to ship the upside while silently inheriting the downside.
+**The three costs, all mandatory, none optional:**
+1. `SameSite=Strict` on the session cookie (barrier one).
+2. A **per-session CSRF token** required on every cookie-authenticated mutation, compared in constant time (barrier two). Bearer requests must stay exempt, or you have broken your API for no gain.
+3. **Retire `Access-Control-Allow-Origin: *` on the cookie routes.** Wildcard origin plus credentials is invalid and unsafe; split CORS by surface — open for the machine API, own-origin-with-credentials for the console.
+**Two more that are easy to miss:** an unauthenticated "email me a link" endpoint is an **email bomb** without per-address and per-IP rate limits; and it must reply **identically for known and unknown addresses** or it becomes a user-enumeration oracle. Verify that by diffing the two responses byte for byte, not by reading the code.
+**Scope the session deliberately:** here a session authorises the management plane ONLY and carries no data-source scope at all, so a stolen session cannot query a BI tool or an ad account. That cap is what made it safe to let a session take the highest role across a person's tokens.
+
+
 ### 2026-08-25 · The commonest dashboard bug is a READER WITH NO WRITER, and it is now a CI test you can copy
 **Source:** data-agent (admin console build). **Who needs it:** **every project with a DB-backed dashboard or report view** — shikho-paid-ads-dashboard, shikho-organic-social-analytics, social-dashboard (Atlas/Cartora), purple-fox, adops-os, career-ops-private.
 In one build this shipped **twice**. First: three new Neon tables, twelve endpoints reading them, a writer for **one** table — so six of twelve endpoints could only ever return empty. Then, after fixing that: **eight columns declared with no writer**, three of which the UI depended on (`params_summary` was the field the audit row's "Details" expander reads, so every row would have expanded to nothing), plus **four indexes on always-NULL columns** costing writes on the hot path for zero reads.
@@ -24,23 +42,7 @@ Two bugs in hand-written SQL passed review and died on first contact with a real
 **The technique, ~2 minutes and needs no schema privileges:** `CREATE TEMP TABLE` mirroring the real shape, run the statements **verbatim** through Neon's HTTP `/sql` **batch** endpoint (a batch shares one session, so the TEMP table is visible across statements), then assert on the read-back. It caught the 42P18 immediately and also proved the running-average arithmetic (100 → 150 → 200, preserved through a NULL write).
 **Rule:** fire-and-forget writes deserve this **more** than normal ones, precisely because they can never fail loudly. If a write is wrapped in an empty catch, you have chosen to never learn it is broken — so prove it works once, up front.
 
-### 2026-08-25 · A deny-list on an open-ended input is an escalation; and prefer structure over validation
-**Source:** data-agent (token minting + self-service rotation). **Who needs it:** **every project that issues credentials or checks roles** — cartora-outbound, adops-os, social-dashboard (BetterAuth), career-ops-private, purple-fox, and any MCP server with scoped tokens.
-**The escalation:** the token minter accepted any `role` string. The gate that protects report management (`assertCanManageReports`) only **denies** `analyst` and `viewer` — so `role: "typo"`, or `role: "superuser"`, sailed past it and behaved like an operator. A deny-list over an open-ended input grants by default to anything it has not heard of. Fixed with a `MINTABLE_ROLES` allowlist validated at the single point where roles enter the system.
-**The stronger idea, from building self-service token rotation:** the requirement was "a user may replace their own token but must never widen their own scope". The obvious build reads role/sources from the request and validates them against the current grant — that works, and it breaks the first time someone edits the validation. Instead the replacement is produced by `INSERT ... SELECT` from the old row, and the builder binds **exactly three parameters** (old hash, new hash, optional label). **There is no place for a scope value to enter**, so the property holds by shape rather than by check. Expiry is carried across unchanged, so rotation is a replacement and never a renewal.
-The tests assert `params.length === 3` and that no scope column is ever bound as `col = $n` — so a future change that **adds** a parameter fails, even if it looks harmless. Verified adversarially against a live server: a rotate body carrying `role: admin, sources: *, canSend: true, expiresInDays: 3650` changed nothing.
-**Both rules in one line:** allowlist what may enter, and where a rule must hold forever, **remove the ability to break it rather than detecting the break**.
-
-### 2026-08-25 · A green test suite that does not touch your diff is not verification (and concurrent sessions split LEARNINGS.md)
-**Source:** data-agent. **Who needs it:** **every session in every repo**, and especially any repo where several agents write knowledge files at once.
-**The reporting failure:** ~340 new lines were shipped, `node --test` reported **212 passing**, and that was presented as verification. None of those tests imported the new code. A passing suite says *"I broke nothing"*; it never says *"what I added works"*. Those are different claims and only the first was true. **Before citing a test run as evidence, confirm the suite actually exercises the new code** — if it does not, the honest report is "no regressions, new code untested".
-**The concurrency finding:** `data-agent/LEARNINGS.md` gained entries from a **parallel session** appended at the BOTTOM while this session had been prepending at the TOP. Nothing was lost, but the file now reads newest-first then oldest-first, so "read the top for recent context" gets half the story — which matters because the hub aggregates these files. **State the ordering convention inside the file, and when you find entries in the other order, leave them and note the split** rather than reordering another session's work (reordering destroys the diff that shows who wrote what).
-
-
-### 2026-08-25 · One deploy failed SIX times — the anatomy, and why documentation could not stop it
-**Source:** whatsapp-group-reporting (relay deploy). **Who needs it:** **every project with a droplet/remote deploy** — data-agent, atlas-pdf, purple-fox, report-sender-dashboard — and **every session that writes a runbook and expects it to be followed**.
-A single one-file deploy took **six attempts**. Anatomy, because each failure was a *different* mechanism and only the last two were the "obvious" kind:
-1–3. **Droplet commands and a local `scp` pasted into the wrong shell.** A deploy spans two machines and the failure is **asymmetric**: droplet c
+### 2026-08-25 · A deny-list on an open-ended input is an escala
 
 ## Recent across all projects (last 14 days)
 
